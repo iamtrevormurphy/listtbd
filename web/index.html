@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Listapp - AI-powered smart shopping list">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Listapp">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Listapp</title>
+  <link rel="manifest" href="manifest.json">
+
+  <script>
+    // Notification helper functions
+    window.listappNotifications = {
+      // Check if notifications are supported
+      isSupported: function() {
+        return 'Notification' in window;
+      },
+
+      // Request permission
+      requestPermission: async function() {
+        if (!this.isSupported()) return 'unsupported';
+        const permission = await Notification.requestPermission();
+        return permission;
+      },
+
+      // Get current permission status
+      getPermission: function() {
+        if (!this.isSupported()) return 'unsupported';
+        return Notification.permission;
+      },
+
+      // Send a notification
+      send: function(title, body, icon) {
+        if (!this.isSupported()) return false;
+        if (Notification.permission !== 'granted') return false;
+
+        const notification = new Notification(title, {
+          body: body,
+          icon: icon || '/icons/Icon-192.png',
+          badge: '/icons/Icon-192.png',
+          tag: 'listapp-reminder',
+          renotify: true,
+        });
+
+        notification.onclick = function() {
+          window.focus();
+          notification.close();
+        };
+
+        return true;
+      }
+    };
+
+    // Request permission on first interaction
+    document.addEventListener('click', function requestOnClick() {
+      if (window.listappNotifications.getPermission() === 'default') {
+        window.listappNotifications.requestPermission();
+      }
+      document.removeEventListener('click', requestOnClick);
+    }, { once: true });
+  </script>
+</head>
+<body>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
