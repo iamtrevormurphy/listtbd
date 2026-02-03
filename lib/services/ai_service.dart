@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'dart:js_interop';
-import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Service for AI-powered features

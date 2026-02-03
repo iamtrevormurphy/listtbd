@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/theme_config.dart';
 import '../../../core/constants/categories.dart';
 import '../../../data/models/list_item.dart';
 import '../../../data/models/repurchase_suggestion.dart';
+import '../../../data/models/store.dart';
 import '../../../services/ai_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/list_provider.dart';
@@ -46,12 +48,93 @@ class _HomeContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final itemsAsync = ref.watch(activeItemsProvider(listId));
     final suggestionsAsync = ref.watch(suggestionsProvider);
+    final storesAsync = ref.watch(storesProvider);
+    final sortMode = ref.watch(sortModeProvider);
     final listNotifier = ref.read(listNotifierProvider.notifier);
 
     return Scaffold(
+      backgroundColor: ThemeConfig.background,
       appBar: AppBar(
         title: const Text('Shopping List'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
         actions: [
+          // Sort toggle
+          PopupMenuButton<SortMode>(
+            icon: Icon(
+              sortMode == SortMode.none
+                  ? Icons.sort
+                  : sortMode == SortMode.store
+                      ? Icons.store
+                      : Icons.category,
+              color: sortMode != SortMode.none
+                  ? ThemeConfig.primaryColor
+                  : null,
+            ),
+            tooltip: 'Sort items',
+            onSelected: (mode) {
+              ref.read(sortModeProvider.notifier).state = mode;
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: SortMode.none,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.list,
+                      color: sortMode == SortMode.none
+                          ? ThemeConfig.primaryColor
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('All Items'),
+                    if (sortMode == SortMode.none) ...[
+                      const Spacer(),
+                      Icon(Icons.check, color: ThemeConfig.primaryColor),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: SortMode.store,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.store,
+                      color: sortMode == SortMode.store
+                          ? ThemeConfig.primaryColor
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('By Store'),
+                    if (sortMode == SortMode.store) ...[
+                      const Spacer(),
+                      Icon(Icons.check, color: ThemeConfig.primaryColor),
+                    ],
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: SortMode.aisle,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.category,
+                      color: sortMode == SortMode.aisle
+                          ? ThemeConfig.primaryColor
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    const Text('By Aisle'),
+                    if (sortMode == SortMode.aisle) ...[
+                      const Spacer(),
+                      Icon(Icons.check, color: ThemeConfig.primaryColor),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.inventory_2_outlined),
             tooltip: 'Archive',
@@ -66,9 +149,21 @@ class _HomeContent extends ConsumerWidget {
             onSelected: (value) async {
               if (value == 'signout') {
                 await ref.read(authNotifierProvider.notifier).signOut();
+              } else if (value == 'stores') {
+                _showStoreManagement(context, ref);
               }
             },
             itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'stores',
+                child: Row(
+                  children: [
+                    Icon(Icons.store),
+                    SizedBox(width: 8),
+                    Text('Manage Stores'),
+                  ],
+                ),
+              ),
               const PopupMenuItem(
                 value: 'signout',
                 child: Row(
@@ -91,22 +186,27 @@ class _HomeContent extends ConsumerWidget {
               error: (error, _) => Center(child: Text('Error: $error')),
               data: (items) {
                 final suggestions = suggestionsAsync.valueOrNull ?? [];
+                final stores = storesAsync.valueOrNull ?? [];
 
                 if (items.isEmpty && suggestions.isEmpty) {
                   return const _EmptyState();
                 }
 
-                final grouped = ref.watch(groupedItemsProvider(items));
                 return _ContentList(
                   suggestions: suggestions,
-                  groupedItems: grouped,
+                  items: items,
+                  stores: stores,
+                  sortMode: sortMode,
                   onAddSuggestion: (s) => _addSuggestion(context, ref, s),
                   onDismissSuggestion: (s) => _dismissSuggestion(ref, s),
                   onArchive: (item) => _archiveItem(context, ref, item),
                   onDelete: (item) => _deleteItem(context, ref, item),
-                  onTap: (item) => _editItem(context, ref, item),
+                  onTap: (item) => _editItem(context, ref, item, stores),
                   onCategoryChanged: (item, category) async {
                     await listNotifier.updateCategory(item.id, category);
+                  },
+                  onStoreChanged: (item, store) async {
+                    await listNotifier.updateStore(item.id, store);
                   },
                 );
               },
@@ -118,6 +218,14 @@ class _HomeContent extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showStoreManagement(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const _StoreManagementSheet(),
     );
   }
 
@@ -172,11 +280,11 @@ class _HomeContent extends ConsumerWidget {
     );
   }
 
-  void _editItem(BuildContext context, WidgetRef ref, ListItem item) {
+  void _editItem(BuildContext context, WidgetRef ref, ListItem item, List<Store> stores) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _EditItemSheet(item: item),
+      builder: (context) => _EditItemSheet(item: item, stores: stores),
     );
   }
 
@@ -220,16 +328,24 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.shopping_cart_outlined,
-            size: 80,
-            color: Colors.grey.shade400,
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.shopping_cart_outlined,
+              size: 64,
+              color: ThemeConfig.primaryColor,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
             'Your list is empty',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.grey.shade600,
+                  color: Colors.grey.shade700,
+                  fontWeight: FontWeight.w600,
                 ),
           ),
           const SizedBox(height: 8),
@@ -245,29 +361,46 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ContentList extends StatelessWidget {
+class _ContentList extends ConsumerWidget {
   final List<RepurchaseSuggestion> suggestions;
-  final Map<String, List<ListItem>> groupedItems;
+  final List<ListItem> items;
+  final List<Store> stores;
+  final SortMode sortMode;
   final Function(RepurchaseSuggestion) onAddSuggestion;
   final Function(RepurchaseSuggestion) onDismissSuggestion;
   final Function(ListItem) onArchive;
   final Function(ListItem) onDelete;
   final Function(ListItem) onTap;
   final Function(ListItem, String) onCategoryChanged;
+  final Function(ListItem, String?) onStoreChanged;
 
   const _ContentList({
     required this.suggestions,
-    required this.groupedItems,
+    required this.items,
+    required this.stores,
+    required this.sortMode,
     required this.onAddSuggestion,
     required this.onDismissSuggestion,
     required this.onArchive,
     required this.onDelete,
     required this.onTap,
     required this.onCategoryChanged,
+    required this.onStoreChanged,
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Get grouped items based on sort mode
+    final Map<String, List<ListItem>> grouped;
+    if (sortMode == SortMode.store) {
+      grouped = ref.watch(itemsByStoreProvider(items));
+    } else if (sortMode == SortMode.aisle) {
+      grouped = ref.watch(itemsByAisleProvider(items));
+    } else {
+      // No grouping - show all items in a flat list
+      grouped = {'': items};
+    }
+
     return ListView(
       padding: const EdgeInsets.only(bottom: 16),
       children: [
@@ -279,43 +412,74 @@ class _ContentList extends StatelessWidget {
             onDismiss: onDismissSuggestion,
           ),
 
-        // Grouped items
-        ...groupedItems.entries.map((entry) {
-          final category = entry.key;
-          final items = entry.value;
-          final emoji = Categories.getEmoji(category);
+        // Items (grouped or flat)
+        ...grouped.entries.map((entry) {
+          final groupName = entry.key;
+          final groupItems = entry.value;
+
+          if (sortMode == SortMode.none) {
+            // Flat list, no headers
+            return Column(
+              children: groupItems.map((item) => SwipeableItem(
+                item: item,
+                onArchive: () => onArchive(item),
+                onDelete: () => onDelete(item),
+                onTap: () => onTap(item),
+                onCategoryChanged: (cat) => onCategoryChanged(item, cat),
+                onStoreChanged: (store) => onStoreChanged(item, store),
+                stores: stores,
+              )).toList(),
+            );
+          }
+
+          // Grouped view with headers
+          final emoji = sortMode == SortMode.aisle
+              ? Categories.getEmoji(groupName)
+              : '🏪';
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                 child: Row(
                   children: [
-                    Text(emoji, style: const TextStyle(fontSize: 20)),
+                    Text(emoji, style: const TextStyle(fontSize: 18)),
                     const SizedBox(width: 8),
                     Text(
-                      category,
+                      groupName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
+                            color: ThemeConfig.primaryColor,
                           ),
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      '(${items.length})',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey,
-                          ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${groupItems.length}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: ThemeConfig.primaryColor,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              ...items.map((item) => SwipeableItem(
+              ...groupItems.map((item) => SwipeableItem(
                     item: item,
                     onArchive: () => onArchive(item),
                     onDelete: () => onDelete(item),
                     onTap: () => onTap(item),
                     onCategoryChanged: (cat) => onCategoryChanged(item, cat),
+                    onStoreChanged: (store) => onStoreChanged(item, store),
+                    stores: stores,
                   )),
             ],
           );
@@ -325,10 +489,137 @@ class _ContentList extends StatelessWidget {
   }
 }
 
+class _StoreManagementSheet extends ConsumerStatefulWidget {
+  const _StoreManagementSheet();
+
+  @override
+  ConsumerState<_StoreManagementSheet> createState() => _StoreManagementSheetState();
+}
+
+class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addStore() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty) return;
+
+    await ref.read(listNotifierProvider.notifier).addStore(name);
+    _controller.clear();
+    ref.invalidate(storesProvider);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final storesAsync = ref.watch(storesProvider);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Manage Stores',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      decoration: InputDecoration(
+                        hintText: 'Add a store...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (_) => _addStore(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton(
+                    onPressed: _addStore,
+                    child: const Text('Add'),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: storesAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Error: $e')),
+                data: (stores) {
+                  if (stores.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(
+                        'No stores added yet',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey.shade500),
+                      ),
+                    );
+                  }
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: stores.length,
+                    itemBuilder: (context, index) {
+                      final store = stores[index];
+                      return ListTile(
+                        leading: const Icon(Icons.store_outlined),
+                        title: Text(store.name),
+                        trailing: IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () async {
+                            // Could add delete functionality here
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EditItemSheet extends ConsumerStatefulWidget {
   final ListItem item;
+  final List<Store> stores;
 
-  const _EditItemSheet({required this.item});
+  const _EditItemSheet({required this.item, required this.stores});
 
   @override
   ConsumerState<_EditItemSheet> createState() => _EditItemSheetState();
@@ -338,6 +629,8 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
   late TextEditingController _nameController;
   late TextEditingController _notesController;
   late int _quantity;
+  String? _selectedStore;
+  String? _selectedCategory;
 
   @override
   void initState() {
@@ -345,6 +638,8 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
     _nameController = TextEditingController(text: widget.item.name);
     _notesController = TextEditingController(text: widget.item.notes ?? '');
     _quantity = widget.item.quantity;
+    _selectedStore = widget.item.store;
+    _selectedCategory = widget.item.category;
   }
 
   @override
@@ -359,6 +654,8 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
       name: _nameController.text.trim(),
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       quantity: _quantity,
+      store: _selectedStore,
+      category: _selectedCategory,
     );
 
     await ref.read(listNotifierProvider.notifier).updateItem(updated);
@@ -372,7 +669,7 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -394,23 +691,31 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
               const SizedBox(height: 16),
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Item name',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 autofocus: true,
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: _notesController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Notes (optional)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 maxLines: 2,
               ),
               const SizedBox(height: 16),
+
+              // Quantity selector
               Row(
                 children: [
-                  const Text('Quantity:'),
+                  const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(width: 16),
                   IconButton(
                     icon: const Icon(Icons.remove_circle_outline),
@@ -428,9 +733,70 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+
+              // Store dropdown
+              DropdownButtonFormField<String>(
+                initialValue: _selectedStore,
+                decoration: InputDecoration(
+                  labelText: 'Store',
+                  prefixIcon: const Icon(Icons.store_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('No store'),
+                  ),
+                  ...widget.stores.map((store) => DropdownMenuItem(
+                        value: store.name,
+                        child: Text(store.name),
+                      )),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedStore = value);
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Category/Aisle dropdown
+              DropdownButtonFormField<String>(
+                initialValue: _selectedCategory,
+                decoration: InputDecoration(
+                  labelText: 'Aisle',
+                  prefixIcon: const Icon(Icons.category_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: null,
+                    child: Text('No aisle'),
+                  ),
+                  ...Categories.all.map((cat) => DropdownMenuItem(
+                        value: cat.name,
+                        child: Row(
+                          children: [
+                            Text(cat.icon),
+                            const SizedBox(width: 8),
+                            Text(cat.name),
+                          ],
+                        ),
+                      )),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedCategory = value);
+                },
+              ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _save,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
                 child: const Text('Save'),
               ),
             ],
