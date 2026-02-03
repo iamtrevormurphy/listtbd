@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -58,6 +59,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final isLoading = authState.isLoading;
 
     return Scaffold(
+      backgroundColor: ThemeConfig.background,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -68,17 +70,36 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo / Title
-                  Icon(
-                    Icons.check_circle_outline,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.primary,
+                  // Logo
+                  Center(
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: ThemeConfig.primaryColor.withValues(alpha: 0.2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset(
+                          'assets/provisions_logo.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   Text(
-                    'Listapp',
+                    'Provisions',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           fontWeight: FontWeight.bold,
+                          color: ThemeConfig.textPrimary,
                         ),
                     textAlign: TextAlign.center,
                   ),
@@ -86,7 +107,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Text(
                     'Your smart shopping companion',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.grey,
+                          color: ThemeConfig.textSecondary,
                         ),
                     textAlign: TextAlign.center,
                   ),

@@ -519,10 +519,27 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
     setState(() => _isAdding = true);
 
     try {
-      await ref.read(listNotifierProvider.notifier).addStore(name);
+      // Call repository directly for better control
+      final repo = ref.read(listRepositoryProvider);
+      await repo.addStore(name);
       _controller.clear();
       // Force refresh the stores list
       ref.invalidate(storesProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Added "$name"')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding store: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isAdding = false);
@@ -530,10 +547,27 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
     }
   }
 
-  Future<void> _deleteStore(String storeId) async {
-    final repo = ref.read(listRepositoryProvider);
-    await repo.deleteStore(storeId);
-    ref.invalidate(storesProvider);
+  Future<void> _deleteStore(String storeId, String storeName) async {
+    try {
+      final repo = ref.read(listRepositoryProvider);
+      await repo.deleteStore(storeId);
+      ref.invalidate(storesProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Deleted "$storeName"')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting store: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -679,7 +713,7 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
                             Icons.delete_outline,
                             color: Colors.grey.shade500,
                           ),
-                          onPressed: () => _deleteStore(store.id),
+                          onPressed: () => _deleteStore(store.id, store.name),
                         ),
                       );
                     },
