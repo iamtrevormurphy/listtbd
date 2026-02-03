@@ -1,5 +1,5 @@
-name: listapp
-description: AI-powered smart shopping list app
+name: provisions
+description: Provisions - AI-powered smart shopping list app
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -32,6 +32,9 @@ dependencies:
 
   # Icons
   cupertino_icons: ^1.0.6
+
+  # Fonts
+  google_fonts: ^6.1.0
 
 dev_dependencies:
   flutter_test:

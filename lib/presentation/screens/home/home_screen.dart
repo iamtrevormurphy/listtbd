@@ -55,7 +55,7 @@ class _HomeContent extends ConsumerWidget {
     return Scaffold(
       backgroundColor: ThemeConfig.background,
       appBar: AppBar(
-        title: const Text('Shopping List'),
+        title: const Text('Provisions'),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         actions: [
@@ -268,16 +268,22 @@ class _HomeContent extends ConsumerWidget {
     );
   }
 
-  void _deleteItem(BuildContext context, WidgetRef ref, ListItem item) {
-    ref.read(listNotifierProvider.notifier).deleteItem(item.id);
+  Future<void> _deleteItem(BuildContext context, WidgetRef ref, ListItem item) async {
+    // Await the delete to ensure it completes before showing snackbar
+    await ref.read(listNotifierProvider.notifier).deleteItem(item.id);
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${item.name} deleted'),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    // Invalidate the items provider to force refresh
+    ref.invalidate(activeItemsProvider(listId));
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${item.name} deleted'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   void _editItem(BuildContext context, WidgetRef ref, ListItem item, List<Store> stores) {
@@ -498,6 +504,7 @@ class _StoreManagementSheet extends ConsumerStatefulWidget {
 
 class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
   final _controller = TextEditingController();
+  bool _isAdding = false;
 
   @override
   void dispose() {
@@ -509,8 +516,23 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
     final name = _controller.text.trim();
     if (name.isEmpty) return;
 
-    await ref.read(listNotifierProvider.notifier).addStore(name);
-    _controller.clear();
+    setState(() => _isAdding = true);
+
+    try {
+      await ref.read(listNotifierProvider.notifier).addStore(name);
+      _controller.clear();
+      // Force refresh the stores list
+      ref.invalidate(storesProvider);
+    } finally {
+      if (mounted) {
+        setState(() => _isAdding = false);
+      }
+    }
+  }
+
+  Future<void> _deleteStore(String storeId) async {
+    final repo = ref.read(listRepositoryProvider);
+    await repo.deleteStore(storeId);
     ref.invalidate(storesProvider);
   }
 
@@ -534,7 +556,9 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
                 children: [
                   Text(
                     'Manage Stores',
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -552,7 +576,8 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
                     child: TextField(
                       controller: _controller,
                       decoration: InputDecoration(
-                        hintText: 'Add a store...',
+                        hintText: 'Enter store name...',
+                        prefixIcon: const Icon(Icons.store_outlined),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -561,29 +586,69 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
                           vertical: 12,
                         ),
                       ),
+                      textCapitalization: TextCapitalization.words,
                       onSubmitted: (_) => _addStore(),
                     ),
                   ),
                   const SizedBox(width: 12),
-                  FilledButton(
-                    onPressed: _addStore,
-                    child: const Text('Add'),
+                  FilledButton.icon(
+                    onPressed: _isAdding ? null : _addStore,
+                    icon: _isAdding
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.add),
+                    label: const Text('Add'),
                   ),
                 ],
               ),
             ),
             Flexible(
               child: storesAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error: $e')),
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Center(child: Text('Error: $e')),
+                ),
                 data: (stores) {
                   if (stores.isEmpty) {
                     return Padding(
                       padding: const EdgeInsets.all(32),
-                      child: Text(
-                        'No stores added yet',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey.shade500),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.store_outlined,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No stores added yet',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Add stores like "Costco" or "Whole Foods"',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.grey.shade500,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   }
@@ -593,13 +658,28 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
                     itemBuilder: (context, index) {
                       final store = stores[index];
                       return ListTile(
-                        leading: const Icon(Icons.store_outlined),
-                        title: Text(store.name),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            Icons.store,
+                            color: ThemeConfig.primaryColor,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          store.name,
+                          style: const TextStyle(fontWeight: FontWeight.w500),
+                        ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () async {
-                            // Could add delete functionality here
-                          },
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: Colors.grey.shade500,
+                          ),
+                          onPressed: () => _deleteStore(store.id),
                         ),
                       );
                     },
