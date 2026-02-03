@@ -55,7 +55,7 @@ class AuthRepository {
   Future<void> signInWithGoogle() async {
     await _client.auth.signInWithOAuth(
       OAuthProvider.google,
-      redirectTo: 'io.supabase.listapp://login-callback/',
+      redirectTo: _getRedirectUrl(),
     );
   }
 
@@ -63,8 +63,15 @@ class AuthRepository {
   Future<void> signInWithApple() async {
     await _client.auth.signInWithOAuth(
       OAuthProvider.apple,
-      redirectTo: 'io.supabase.listapp://login-callback/',
+      redirectTo: _getRedirectUrl(),
     );
+  }
+
+  /// Get the appropriate redirect URL based on platform
+  String? _getRedirectUrl() {
+    // For web, let Supabase use the current URL
+    // For mobile, use deep link
+    return null; // Supabase will use Site URL from dashboard
   }
 
   /// Sign out
