@@ -48,6 +48,20 @@ class ThemeConfig {
     'Other': Color(0xFFE5E7EB), // Soft gray
   };
 
+  // Young Serif text style for app name
+  static TextStyle youngSerifStyle({
+    double fontSize = 28,
+    FontWeight fontWeight = FontWeight.bold,
+    Color color = textPrimary,
+  }) {
+    return GoogleFonts.youngSerif(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: -0.5,
+    );
+  }
+
   // Inter text theme
   static TextTheme get _interTextTheme {
     return GoogleFonts.interTextTheme(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/config/theme_config.dart';
 import '../../providers/auth_provider.dart';
@@ -72,35 +73,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 children: [
                   // Logo
                   Center(
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: ThemeConfig.primaryColor.withValues(alpha: 0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: Image.asset(
-                          'assets/provisions_logo.png',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                    child: SvgPicture.asset(
+                      'assets/provisions_logo.svg',
+                      width: 120,
+                      height: 120,
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text(
                     'Provisions',
-                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: ThemeConfig.textPrimary,
-                        ),
+                    style: ThemeConfig.youngSerifStyle(
+                      fontSize: 32,
+                      color: ThemeConfig.textPrimary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),

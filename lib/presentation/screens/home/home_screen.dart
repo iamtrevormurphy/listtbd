@@ -55,7 +55,13 @@ class _HomeContent extends ConsumerWidget {
     return Scaffold(
       backgroundColor: ThemeConfig.background,
       appBar: AppBar(
-        title: const Text('Provisions'),
+        title: Text(
+          'Provisions',
+          style: ThemeConfig.youngSerifStyle(
+            fontSize: 22,
+            color: ThemeConfig.textPrimary,
+          ),
+        ),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         actions: [

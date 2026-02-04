@@ -36,6 +36,9 @@ dependencies:
   # Fonts
   google_fonts: ^6.1.0
 
+  # SVG support
+  flutter_svg: ^2.0.10+1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
