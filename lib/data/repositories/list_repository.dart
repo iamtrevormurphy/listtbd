@@ -36,10 +36,32 @@ class ListRepository {
     if (lists.isNotEmpty) return lists.first;
 
     // Create default list
+    return createList(name: 'Shopping List');
+  }
+
+  /// Get a specific list by ID
+  Future<ShoppingList> getList(String listId) async {
+    final response = await _client
+        .from('lists')
+        .select()
+        .eq('id', listId)
+        .single();
+
+    return ShoppingList.fromJson(response);
+  }
+
+  /// Create a new list
+  Future<ShoppingList> createList({
+    required String name,
+    String? description,
+    String? icon,
+  }) async {
     final newList = {
       'id': _uuid.v4(),
       'user_id': _userId,
-      'name': 'Shopping List',
+      'name': name.trim(),
+      'description': description?.trim(),
+      'icon': icon,
     };
 
     final response = await _client
@@ -49,6 +71,35 @@ class ListRepository {
         .single();
 
     return ShoppingList.fromJson(response);
+  }
+
+  /// Update a list
+  Future<ShoppingList> updateList({
+    required String listId,
+    String? name,
+    String? description,
+    String? icon,
+  }) async {
+    final updates = <String, dynamic>{
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    if (name != null) updates['name'] = name.trim();
+    if (description != null) updates['description'] = description.trim();
+    if (icon != null) updates['icon'] = icon;
+
+    final response = await _client
+        .from('lists')
+        .update(updates)
+        .eq('id', listId)
+        .select()
+        .single();
+
+    return ShoppingList.fromJson(response);
+  }
+
+  /// Delete a list and all its items
+  Future<void> deleteList(String listId) async {
+    await _client.from('lists').delete().eq('id', listId);
   }
 
   /// Stream of list items (real-time)

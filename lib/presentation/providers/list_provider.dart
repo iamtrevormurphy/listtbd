@@ -10,10 +10,35 @@ final listRepositoryProvider = Provider<ListRepository>((ref) {
   return ListRepository();
 });
 
+/// All shopping lists for the user
+final allListsProvider = FutureProvider<List<ShoppingList>>((ref) async {
+  final repo = ref.watch(listRepositoryProvider);
+  return repo.getLists();
+});
+
+/// Currently selected list ID (persisted in state)
+final selectedListIdProvider = StateProvider<String?>((ref) => null);
+
 /// Current shopping list provider
 final currentListProvider = FutureProvider<ShoppingList>((ref) async {
   final repo = ref.watch(listRepositoryProvider);
-  return repo.getDefaultList();
+  final selectedId = ref.watch(selectedListIdProvider);
+
+  if (selectedId != null) {
+    try {
+      return await repo.getList(selectedId);
+    } catch (_) {
+      // If selected list doesn't exist, fall back to default
+    }
+  }
+
+  // Get default list and update selected ID
+  final defaultList = await repo.getDefaultList();
+  // Use Future.microtask to avoid modifying provider during build
+  Future.microtask(() {
+    ref.read(selectedListIdProvider.notifier).state = defaultList.id;
+  });
+  return defaultList;
 });
 
 /// Active (non-archived) items stream
@@ -171,6 +196,75 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
     });
 
     return result;
+  }
+
+  /// Create a new shopping list
+  Future<ShoppingList?> createList({
+    required String name,
+    String? description,
+    String? icon,
+  }) async {
+    if (name.trim().isEmpty) return null;
+
+    state = const AsyncValue.loading();
+    ShoppingList? result;
+
+    state = await AsyncValue.guard(() async {
+      result = await _repository.createList(
+        name: name,
+        description: description,
+        icon: icon,
+      );
+      _ref.invalidate(allListsProvider);
+    });
+
+    return result;
+  }
+
+  /// Switch to a different list
+  void switchList(String listId) {
+    _ref.read(selectedListIdProvider.notifier).state = listId;
+    _ref.invalidate(currentListProvider);
+  }
+
+  /// Update a list's name, description, and icon
+  Future<ShoppingList?> updateList({
+    required String listId,
+    String? name,
+    String? description,
+    String? icon,
+  }) async {
+    state = const AsyncValue.loading();
+    ShoppingList? result;
+
+    state = await AsyncValue.guard(() async {
+      result = await _repository.updateList(
+        listId: listId,
+        name: name,
+        description: description,
+        icon: icon,
+      );
+      _ref.invalidate(allListsProvider);
+      _ref.invalidate(currentListProvider);
+    });
+
+    return result;
+  }
+
+  /// Delete a list
+  Future<void> deleteList(String listId) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _repository.deleteList(listId);
+      _ref.invalidate(allListsProvider);
+
+      // If we deleted the current list, switch to default
+      final currentId = _ref.read(selectedListIdProvider);
+      if (currentId == listId) {
+        _ref.read(selectedListIdProvider.notifier).state = null;
+        _ref.invalidate(currentListProvider);
+      }
+    });
   }
 }
 

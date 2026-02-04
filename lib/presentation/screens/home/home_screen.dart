@@ -5,6 +5,7 @@ import '../../../core/config/theme_config.dart';
 import '../../../core/constants/categories.dart';
 import '../../../data/models/list_item.dart';
 import '../../../data/models/repurchase_suggestion.dart';
+import '../../../data/models/shopping_list.dart';
 import '../../../data/models/store.dart';
 import '../../../services/ai_service.dart';
 import '../../providers/auth_provider.dart';
@@ -12,6 +13,8 @@ import '../../providers/list_provider.dart';
 import '../../providers/suggestion_provider.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/quick_add_bar.dart';
+import '../lists/all_lists_screen.dart';
+import '../lists/edit_list_screen.dart';
 import '../../widgets/suggestion_card.dart';
 import '../../widgets/swipeable_item.dart';
 import '../archive/archive_screen.dart';
@@ -35,15 +38,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       error: (error, _) => Scaffold(
         body: Center(child: Text('Error: $error')),
       ),
-      data: (list) => _HomeContent(listId: list.id),
+      data: (list) => _HomeContent(list: list),
     );
   }
 }
 
 class _HomeContent extends ConsumerWidget {
-  final String listId;
+  final ShoppingList list;
 
-  const _HomeContent({required this.listId});
+  const _HomeContent({required this.list});
+
+  String get listId => list.id;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -188,6 +193,18 @@ class _HomeContent extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          // Current list header
+          _ListHeader(
+            list: list,
+            onTap: () => Navigator.push(
+              context,
+              SlideFromLeftRoute(page: const AllListsScreen()),
+            ),
+            onEdit: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => EditListScreen(list: list)),
+            ),
+          ),
           Expanded(
             child: itemsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -374,6 +391,110 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ListHeader extends StatelessWidget {
+  final ShoppingList list;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+
+  const _ListHeader({
+    required this.list,
+    required this.onTap,
+    required this.onEdit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.7),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              // Arrow on left pointing left
+              Icon(
+                Icons.chevron_left,
+                color: ThemeConfig.textSecondary,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      list.name,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    if (list.description != null && list.description!.isNotEmpty)
+                      Text(
+                        list.description!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: ThemeConfig.textSecondary,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Edit button
+              IconButton(
+                icon: Icon(
+                  Icons.edit_outlined,
+                  color: ThemeConfig.textSecondary,
+                  size: 20,
+                ),
+                onPressed: onEdit,
+                tooltip: 'Edit list',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+              const SizedBox(width: 12),
+              // List icon on right - uses custom icon
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  list.iconData,
+                  color: ThemeConfig.primaryColor,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Custom page route that slides from left to right (reverse of default)
+class SlideFromLeftRoute<T> extends PageRouteBuilder<T> {
+  final Widget page;
+
+  SlideFromLeftRoute({required this.page})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            const begin = Offset(-1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOut;
+            var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+            return SlideTransition(
+              position: animation.drive(tween),
+              child: child,
+            );
+          },
+        );
 }
 
 class _ContentList extends ConsumerWidget {
