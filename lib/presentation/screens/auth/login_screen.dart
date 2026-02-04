@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../core/config/theme_config.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/animated_background.dart';
+import 'email_confirmation_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -31,27 +32,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final notifier = ref.read(authNotifierProvider.notifier);
+    final email = _emailController.text.trim();
 
     if (_isSignUp) {
-      await notifier.signUp(
-        email: _emailController.text.trim(),
+      final result = await notifier.signUp(
+        email: email,
         password: _passwordController.text,
       );
+
+      if (!mounted) return;
+
+      if (result.needsEmailConfirmation) {
+        // Navigate to email confirmation screen
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => EmailConfirmationScreen(email: email),
+          ),
+        );
+      } else if (result.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.error!),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } else {
       await notifier.signIn(
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
       );
-    }
 
-    final state = ref.read(authNotifierProvider);
-    if (state.hasError && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(state.error.toString()),
-          backgroundColor: Colors.red,
-        ),
-      );
+      final state = ref.read(authNotifierProvider);
+      if (state.hasError && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(state.error.toString()),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

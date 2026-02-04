@@ -3,6 +3,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/repositories/auth_repository.dart';
 
+/// Result of a sign-up attempt
+class SignUpResult {
+  final bool needsEmailConfirmation;
+  final String? error;
+
+  SignUpResult({
+    this.needsEmailConfirmation = false,
+    this.error,
+  });
+
+  bool get isSuccess => error == null;
+}
+
 /// Auth repository provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository();
@@ -26,19 +39,29 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
   AuthNotifier(this._repository) : super(const AsyncValue.data(null));
 
-  Future<void> signUp({
+  /// Sign up and return result indicating if email confirmation is needed
+  Future<SignUpResult> signUp({
     required String email,
     required String password,
     String? displayName,
   }) async {
     state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      await _repository.signUp(
+    try {
+      final response = await _repository.signUp(
         email: email,
         password: password,
         displayName: displayName,
       );
-    });
+
+      // If user exists but no session, email confirmation is required
+      final needsConfirmation = response.user != null && response.session == null;
+
+      state = const AsyncValue.data(null);
+      return SignUpResult(needsEmailConfirmation: needsConfirmation);
+    } catch (e) {
+      state = AsyncValue.error(e, StackTrace.current);
+      return SignUpResult(error: e.toString());
+    }
   }
 
   Future<void> signIn({
