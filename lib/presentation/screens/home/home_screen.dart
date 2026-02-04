@@ -10,6 +10,7 @@ import '../../../services/ai_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/list_provider.dart';
 import '../../providers/suggestion_provider.dart';
+import '../../widgets/animated_background.dart';
 import '../../widgets/quick_add_bar.dart';
 import '../../widgets/suggestion_card.dart';
 import '../../widgets/swipeable_item.dart';
@@ -52,18 +53,19 @@ class _HomeContent extends ConsumerWidget {
     final sortMode = ref.watch(sortModeProvider);
     final listNotifier = ref.read(listNotifierProvider.notifier);
 
-    return Scaffold(
-      backgroundColor: ThemeConfig.background,
-      appBar: AppBar(
-        title: Text(
-          'Provisions',
-          style: ThemeConfig.youngSerifStyle(
-            fontSize: 22,
-            color: ThemeConfig.textPrimary,
+    return AnimatedBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: Text(
+            'Provisions',
+            style: ThemeConfig.youngSerifStyle(
+              fontSize: 22,
+              color: ThemeConfig.textPrimary,
+            ),
           ),
-        ),
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          surfaceTintColor: Colors.transparent,
         actions: [
           // Sort toggle
           PopupMenuButton<SortMode>(
@@ -223,6 +225,7 @@ class _HomeContent extends ConsumerWidget {
             isLoading: ref.watch(listNotifierProvider).isLoading,
           ),
         ],
+      ),
       ),
     );
   }
