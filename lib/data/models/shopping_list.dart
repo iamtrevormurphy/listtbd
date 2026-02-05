@@ -1,6 +1,61 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+/// Types of lists with different behaviors
+enum ListType {
+  /// Grocery list: Aisle categories (Produce, Dairy, etc.) + stores
+  grocery,
+  /// Shopping list: Broad categories (Clothing, Electronics, etc.) + stores
+  shopping,
+  /// Project list: No categories, no stores - just tasks
+  project;
+
+  String get displayName {
+    switch (this) {
+      case ListType.grocery:
+        return 'Grocery';
+      case ListType.shopping:
+        return 'Shopping';
+      case ListType.project:
+        return 'Project';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case ListType.grocery:
+        return 'Organize by store aisles';
+      case ListType.shopping:
+        return 'Organize by department';
+      case ListType.project:
+        return 'Simple task list';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case ListType.grocery:
+        return Icons.shopping_cart_outlined;
+      case ListType.shopping:
+        return Icons.shopping_bag_outlined;
+      case ListType.project:
+        return Icons.checklist_outlined;
+    }
+  }
+
+  static ListType fromString(String? value) {
+    switch (value) {
+      case 'shopping':
+        return ListType.shopping;
+      case 'project':
+        return ListType.project;
+      case 'grocery':
+      default:
+        return ListType.grocery;
+    }
+  }
+}
+
 @immutable
 class ShoppingList {
   final String id;
@@ -8,6 +63,7 @@ class ShoppingList {
   final String name;
   final String? description;
   final String? icon;
+  final ListType type;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -17,9 +73,16 @@ class ShoppingList {
     required this.name,
     this.description,
     this.icon,
+    this.type = ListType.grocery,
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// Whether this list type supports categories (aisles/departments)
+  bool get supportsCategories => type != ListType.project;
+
+  /// Whether this list type supports stores
+  bool get supportsStores => type != ListType.project;
 
   /// Available icons for lists
   static const List<ListIconOption> availableIcons = [
@@ -57,6 +120,7 @@ class ShoppingList {
       name: json['name'] as String,
       description: json['description'] as String?,
       icon: json['icon'] as String?,
+      type: ListType.fromString(json['type'] as String?),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -69,6 +133,7 @@ class ShoppingList {
       'name': name,
       'description': description,
       'icon': icon,
+      'type': type.name,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
@@ -80,6 +145,7 @@ class ShoppingList {
     String? name,
     String? description,
     String? icon,
+    ListType? type,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -89,6 +155,7 @@ class ShoppingList {
       name: name ?? this.name,
       description: description ?? this.description,
       icon: icon ?? this.icon,
+      type: type ?? this.type,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

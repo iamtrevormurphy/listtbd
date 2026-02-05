@@ -207,6 +207,7 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
     required String name,
     String? description,
     String? icon,
+    String type = 'grocery',
   }) async {
     if (name.trim().isEmpty) return null;
 
@@ -218,6 +219,7 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
         name: name,
         description: description,
         icon: icon,
+        type: type,
       );
       _ref.invalidate(allListsProvider);
     });
@@ -233,12 +235,13 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
     _ref.invalidate(currentListProvider);
   }
 
-  /// Update a list's name, description, and icon
+  /// Update a list's name, description, icon, and type
   Future<ShoppingList?> updateList({
     required String listId,
     String? name,
     String? description,
     String? icon,
+    String? type,
   }) async {
     state = const AsyncValue.loading();
     ShoppingList? result;
@@ -249,6 +252,7 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
         name: name,
         description: description,
         icon: icon,
+        type: type,
       );
       _ref.invalidate(allListsProvider);
       _ref.invalidate(currentListProvider);

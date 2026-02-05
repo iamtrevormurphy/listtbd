@@ -20,6 +20,7 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   String _selectedIcon = 'checklist';
+  ListType _selectedType = ListType.grocery;
   bool _isLoading = false;
 
   @override
@@ -41,6 +42,7 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
           ? null
           : _descriptionController.text.trim(),
       icon: _selectedIcon,
+      type: _selectedType.name,
     );
 
     if (!mounted) return;
@@ -225,6 +227,67 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(color: ThemeConfig.border),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // List type selector
+                        Text(
+                          'List Type',
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: ThemeConfig.textSecondary,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        SegmentedButton<ListType>(
+                          segments: ListType.values.map((type) {
+                            return ButtonSegment<ListType>(
+                              value: type,
+                              label: Text(type.displayName),
+                              icon: Icon(type.icon),
+                            );
+                          }).toList(),
+                          selected: {_selectedType},
+                          onSelectionChanged: (Set<ListType> selected) {
+                            setState(() => _selectedType = selected.first);
+                          },
+                          style: ButtonStyle(
+                            backgroundColor: WidgetStateProperty.resolveWith((states) {
+                              if (states.contains(WidgetState.selected)) {
+                                return ThemeConfig.primaryColor.withValues(alpha: 0.15);
+                              }
+                              return Colors.white;
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: ThemeConfig.primaryColor.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: ThemeConfig.primaryColor.withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _selectedType.icon,
+                                size: 20,
+                                color: ThemeConfig.primaryColor,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  _selectedType.description,
+                                  style: TextStyle(
+                                    color: ThemeConfig.textSecondary,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 32),

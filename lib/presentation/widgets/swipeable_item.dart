@@ -5,10 +5,12 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import '../../core/config/theme_config.dart';
 import '../../core/constants/categories.dart';
 import '../../data/models/list_item.dart';
+import '../../data/models/shopping_list.dart' show ListType;
 import '../../data/models/store.dart';
 
 class SwipeableItem extends StatelessWidget {
   final ListItem item;
+  final ListType listType;
   final VoidCallback onArchive;
   final VoidCallback onDelete;
   final VoidCallback onTap;
@@ -19,6 +21,7 @@ class SwipeableItem extends StatelessWidget {
   const SwipeableItem({
     super.key,
     required this.item,
+    this.listType = ListType.grocery,
     required this.onArchive,
     required this.onDelete,
     required this.onTap,
@@ -140,9 +143,11 @@ class SwipeableItem extends StatelessWidget {
   Widget? _buildSubtitle(BuildContext context) {
     final parts = <Widget>[];
 
-    // Show aisle as subdued text with emoji
-    if (item.category != null) {
-      final emoji = Categories.getEmoji(item.category!);
+    // Show category/aisle as subdued text with emoji (only for non-project lists)
+    if (item.category != null && listType != ListType.project) {
+      final emoji = listType == ListType.grocery
+          ? Categories.getEmoji(item.category!)
+          : ShoppingCategories.getEmoji(item.category!);
       parts.add(
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -161,8 +166,8 @@ class SwipeableItem extends StatelessWidget {
       );
     }
 
-    // Show store if set
-    if (item.store != null) {
+    // Show store if set (only for non-project lists)
+    if (item.store != null && listType != ListType.project) {
       if (parts.isNotEmpty) {
         parts.add(
           Padding(

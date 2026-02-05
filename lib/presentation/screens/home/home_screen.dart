@@ -5,7 +5,7 @@ import '../../../core/config/theme_config.dart';
 import '../../../core/constants/categories.dart';
 import '../../../data/models/list_item.dart';
 import '../../../data/models/repurchase_suggestion.dart';
-import '../../../data/models/shopping_list.dart';
+import '../../../data/models/shopping_list.dart' show ShoppingList, ListType;
 import '../../../data/models/store.dart';
 import '../../../services/ai_service.dart';
 import '../../providers/auth_provider.dart';
@@ -87,82 +87,85 @@ class _HomeContent extends ConsumerWidget {
           backgroundColor: Colors.white.withValues(alpha: 0.9),
           surfaceTintColor: Colors.transparent,
         actions: [
-          // Sort toggle
-          PopupMenuButton<SortMode>(
-            icon: Icon(
-              sortMode == SortMode.none
-                  ? Icons.sort
-                  : sortMode == SortMode.store
-                      ? Icons.store
-                      : Icons.category,
-              color: sortMode != SortMode.none
-                  ? ThemeConfig.primaryColor
-                  : null,
+          // Sort toggle - only show for non-project lists
+          if (list.type != ListType.project)
+            PopupMenuButton<SortMode>(
+              icon: Icon(
+                sortMode == SortMode.none
+                    ? Icons.sort
+                    : sortMode == SortMode.store
+                        ? Icons.store
+                        : Icons.category,
+                color: sortMode != SortMode.none
+                    ? ThemeConfig.primaryColor
+                    : null,
+              ),
+              tooltip: 'Sort items',
+              onSelected: (mode) {
+                ref.read(sortModeProvider.notifier).state = mode;
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: SortMode.none,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.list,
+                        color: sortMode == SortMode.none
+                            ? ThemeConfig.primaryColor
+                            : null,
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('All Items'),
+                      if (sortMode == SortMode.none) ...[
+                        const Spacer(),
+                        Icon(Icons.check, color: ThemeConfig.primaryColor),
+                      ],
+                    ],
+                  ),
+                ),
+                if (list.supportsStores)
+                  PopupMenuItem(
+                    value: SortMode.store,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.store,
+                          color: sortMode == SortMode.store
+                              ? ThemeConfig.primaryColor
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text('By Store'),
+                        if (sortMode == SortMode.store) ...[
+                          const Spacer(),
+                          Icon(Icons.check, color: ThemeConfig.primaryColor),
+                        ],
+                      ],
+                    ),
+                  ),
+                if (list.supportsCategories)
+                  PopupMenuItem(
+                    value: SortMode.aisle,
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.category,
+                          color: sortMode == SortMode.aisle
+                              ? ThemeConfig.primaryColor
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(list.type == ListType.grocery ? 'By Aisle' : 'By Category'),
+                        if (sortMode == SortMode.aisle) ...[
+                          const Spacer(),
+                          Icon(Icons.check, color: ThemeConfig.primaryColor),
+                        ],
+                      ],
+                    ),
+                  ),
+              ],
             ),
-            tooltip: 'Sort items',
-            onSelected: (mode) {
-              ref.read(sortModeProvider.notifier).state = mode;
-            },
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: SortMode.none,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.list,
-                      color: sortMode == SortMode.none
-                          ? ThemeConfig.primaryColor
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('All Items'),
-                    if (sortMode == SortMode.none) ...[
-                      const Spacer(),
-                      Icon(Icons.check, color: ThemeConfig.primaryColor),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SortMode.store,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.store,
-                      color: sortMode == SortMode.store
-                          ? ThemeConfig.primaryColor
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('By Store'),
-                    if (sortMode == SortMode.store) ...[
-                      const Spacer(),
-                      Icon(Icons.check, color: ThemeConfig.primaryColor),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuItem(
-                value: SortMode.aisle,
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.category,
-                      color: sortMode == SortMode.aisle
-                          ? ThemeConfig.primaryColor
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    const Text('By Aisle'),
-                    if (sortMode == SortMode.aisle) ...[
-                      const Spacer(),
-                      Icon(Icons.check, color: ThemeConfig.primaryColor),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
           IconButton(
             icon: const Icon(Icons.inventory_2_outlined),
             tooltip: 'Archive',
@@ -237,11 +240,12 @@ class _HomeContent extends ConsumerWidget {
                   items: items,
                   stores: stores,
                   sortMode: sortMode,
+                  listType: list.type,
                   onAddSuggestion: (s) => _addSuggestion(context, ref, s),
                   onDismissSuggestion: (s) => _dismissSuggestion(ref, s),
                   onArchive: (item) => _archiveItem(context, ref, item),
                   onDelete: (item) => _deleteItem(context, ref, item),
-                  onTap: (item) => _editItem(context, ref, item, stores),
+                  onTap: (item) => _editItem(context, ref, item, stores, list.type),
                   onCategoryChanged: (item, category) async {
                     await listNotifier.updateCategory(item.id, category);
                   },
@@ -276,10 +280,10 @@ class _HomeContent extends ConsumerWidget {
     // Add item first (appears immediately with no category)
     final item = await notifier.addItem(listId: listId, name: name);
 
-    if (item != null) {
-      // Then categorize in background using AI
+    if (item != null && list.supportsCategories) {
+      // Then categorize in background using AI (only for non-project lists)
       final aiService = AIService();
-      final result = await aiService.categorizeItem(name);
+      final result = await aiService.categorizeItem(name, listType: list.type);
 
       // Update the item with the AI-assigned category
       final category = result['category'] as String?;
@@ -327,11 +331,11 @@ class _HomeContent extends ConsumerWidget {
     }
   }
 
-  void _editItem(BuildContext context, WidgetRef ref, ListItem item, List<Store> stores) {
+  void _editItem(BuildContext context, WidgetRef ref, ListItem item, List<Store> stores, ListType listType) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _EditItemSheet(item: item, stores: stores),
+      builder: (context) => _EditItemSheet(item: item, stores: stores, listType: listType),
     );
   }
 
@@ -517,6 +521,7 @@ class _ContentList extends ConsumerWidget {
   final List<ListItem> items;
   final List<Store> stores;
   final SortMode sortMode;
+  final ListType listType;
   final Function(RepurchaseSuggestion) onAddSuggestion;
   final Function(RepurchaseSuggestion) onDismissSuggestion;
   final Function(ListItem) onArchive;
@@ -530,6 +535,7 @@ class _ContentList extends ConsumerWidget {
     required this.items,
     required this.stores,
     required this.sortMode,
+    required this.listType,
     required this.onAddSuggestion,
     required this.onDismissSuggestion,
     required this.onArchive,
@@ -573,6 +579,7 @@ class _ContentList extends ConsumerWidget {
             return Column(
               children: groupItems.map((item) => SwipeableItem(
                 item: item,
+                listType: listType,
                 onArchive: () => onArchive(item),
                 onDelete: () => onDelete(item),
                 onTap: () => onTap(item),
@@ -585,7 +592,9 @@ class _ContentList extends ConsumerWidget {
 
           // Grouped view with headers
           final emoji = sortMode == SortMode.aisle
-              ? Categories.getEmoji(groupName)
+              ? (listType == ListType.grocery
+                  ? Categories.getEmoji(groupName)
+                  : ShoppingCategories.getEmoji(groupName))
               : '🏪';
 
           return Column(
@@ -625,6 +634,7 @@ class _ContentList extends ConsumerWidget {
               ),
               ...groupItems.map((item) => SwipeableItem(
                     item: item,
+                    listType: listType,
                     onArchive: () => onArchive(item),
                     onDelete: () => onDelete(item),
                     onTap: () => onTap(item),
@@ -877,8 +887,9 @@ class _StoreManagementSheetState extends ConsumerState<_StoreManagementSheet> {
 class _EditItemSheet extends ConsumerStatefulWidget {
   final ListItem item;
   final List<Store> stores;
+  final ListType listType;
 
-  const _EditItemSheet({required this.item, required this.stores});
+  const _EditItemSheet({required this.item, required this.stores, required this.listType});
 
   @override
   ConsumerState<_EditItemSheet> createState() => _EditItemSheetState();
@@ -992,64 +1003,68 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-
-              // Store dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _selectedStore,
-                decoration: InputDecoration(
-                  labelText: 'Store',
-                  prefixIcon: const Icon(Icons.store_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // Store dropdown - only show for lists that support stores
+              if (widget.listType != ListType.project) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedStore,
+                  decoration: InputDecoration(
+                    labelText: 'Store',
+                    prefixIcon: const Icon(Icons.store_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: null,
+                      child: Text('No store'),
+                    ),
+                    ...widget.stores.map((store) => DropdownMenuItem(
+                          value: store.name,
+                          child: Text(store.name),
+                        )),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _selectedStore = value);
+                  },
                 ),
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('No store'),
-                  ),
-                  ...widget.stores.map((store) => DropdownMenuItem(
-                        value: store.name,
-                        child: Text(store.name),
-                      )),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedStore = value);
-                },
-              ),
-              const SizedBox(height: 16),
+              ],
 
-              // Category/Aisle dropdown
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
-                decoration: InputDecoration(
-                  labelText: 'Aisle',
-                  prefixIcon: const Icon(Icons.category_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
+              // Category/Aisle dropdown - only show for lists that support categories
+              if (widget.listType != ListType.project) ...[
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategory,
+                  decoration: InputDecoration(
+                    labelText: widget.listType == ListType.grocery ? 'Aisle' : 'Category',
+                    prefixIcon: const Icon(Icons.category_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
+                  items: [
+                    DropdownMenuItem(
+                      value: null,
+                      child: Text(widget.listType == ListType.grocery ? 'No aisle' : 'No category'),
+                    ),
+                    ...(widget.listType == ListType.grocery ? Categories.all : ShoppingCategories.all)
+                        .map((cat) => DropdownMenuItem(
+                              value: cat.name,
+                              child: Row(
+                                children: [
+                                  Text(cat.icon),
+                                  const SizedBox(width: 8),
+                                  Text(cat.name),
+                                ],
+                              ),
+                            )),
+                  ],
+                  onChanged: (value) {
+                    setState(() => _selectedCategory = value);
+                  },
                 ),
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('No aisle'),
-                  ),
-                  ...Categories.all.map((cat) => DropdownMenuItem(
-                        value: cat.name,
-                        child: Row(
-                          children: [
-                            Text(cat.icon),
-                            const SizedBox(width: 8),
-                            Text(cat.name),
-                          ],
-                        ),
-                      )),
-                ],
-                onChanged: (value) {
-                  setState(() => _selectedCategory = value);
-                },
-              ),
+              ],
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: _save,

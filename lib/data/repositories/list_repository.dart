@@ -55,6 +55,7 @@ class ListRepository {
     required String name,
     String? description,
     String? icon,
+    String type = 'grocery',
   }) async {
     final newList = {
       'id': _uuid.v4(),
@@ -62,6 +63,7 @@ class ListRepository {
       'name': name.trim(),
       'description': description?.trim(),
       'icon': icon,
+      'type': type,
     };
 
     final response = await _client
@@ -79,6 +81,7 @@ class ListRepository {
     String? name,
     String? description,
     String? icon,
+    String? type,
   }) async {
     final updates = <String, dynamic>{
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -86,6 +89,7 @@ class ListRepository {
     if (name != null) updates['name'] = name.trim();
     if (description != null) updates['description'] = description.trim();
     if (icon != null) updates['icon'] = icon;
+    if (type != null) updates['type'] = type;
 
     final response = await _client
         .from('lists')

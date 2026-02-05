@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../data/models/shopping_list.dart' show ListType;
+
 /// Service for AI-powered features
 class AIService {
   final SupabaseClient _client;
@@ -8,12 +10,21 @@ class AIService {
       : _client = client ?? Supabase.instance.client;
 
   /// Categorize an item using the Edge Function (with local fallback)
-  /// Returns a map with 'aisle' and 'confidence'
-  Future<Map<String, dynamic>> categorizeItem(String itemName) async {
+  /// Returns a map with 'category' and 'confidence'
+  /// For project lists, returns null category (no categorization needed)
+  Future<Map<String, dynamic>> categorizeItem(String itemName, {ListType listType = ListType.grocery}) async {
+    // Project lists don't need categorization
+    if (listType == ListType.project) {
+      return {'category': null, 'confidence': 0.0};
+    }
+
     try {
       final response = await _client.functions.invoke(
         'categorize-item',
-        body: {'item_name': itemName},
+        body: {
+          'item_name': itemName,
+          'list_type': listType.name,
+        },
       );
 
       if (response.status == 200 && response.data != null) {
@@ -21,17 +32,22 @@ class AIService {
       }
 
       // Fallback to local categorization
-      return _localCategorize(itemName);
+      return _localCategorize(itemName, listType: listType);
     } catch (e) {
       // Fallback to local categorization on error
-      return _localCategorize(itemName);
+      return _localCategorize(itemName, listType: listType);
     }
   }
 
   /// Local keyword-based categorization (fallback when Edge Function unavailable)
-  /// Maps items to store aisles where they would be found
-  Map<String, dynamic> _localCategorize(String itemName) {
+  /// Maps items to store aisles (grocery) or shopping categories (shopping)
+  Map<String, dynamic> _localCategorize(String itemName, {ListType listType = ListType.grocery}) {
     final name = itemName.toLowerCase().trim();
+
+    // For shopping lists, use shopping category keywords
+    if (listType == ListType.shopping) {
+      return _categorizeForShopping(name);
+    }
 
     // Store aisle keywords - mapped to where items are found in stores
     const aisleKeywords = {
@@ -126,6 +142,84 @@ class AIService {
     // Check each aisle - longer phrases first for better matching
     for (final entry in aisleKeywords.entries) {
       // Sort keywords by length descending to match longer phrases first
+      final sortedKeywords = List<String>.from(entry.value)
+        ..sort((a, b) => b.length.compareTo(a.length));
+
+      for (final keyword in sortedKeywords) {
+        if (name.contains(keyword)) {
+          return {
+            'category': entry.key,
+            'confidence': 0.7,
+          };
+        }
+      }
+    }
+
+    // Default to 'Other'
+    return {
+      'category': 'Other',
+      'confidence': 0.3,
+    };
+  }
+
+  /// Local keyword-based categorization for shopping lists
+  Map<String, dynamic> _categorizeForShopping(String name) {
+    const shoppingKeywords = {
+      'Clothing': [
+        'shirt', 'pants', 'jeans', 'dress', 'skirt', 'blouse', 'sweater',
+        'jacket', 'coat', 'hoodie', 't-shirt', 'shorts', 'underwear', 'socks',
+        'bra', 'pajamas', 'suit', 'tie', 'vest', 'cardigan', 'leggings',
+      ],
+      'Shoes': [
+        'shoes', 'sneakers', 'boots', 'sandals', 'heels', 'flats', 'loafers',
+        'slippers', 'flip flops', 'running shoes', 'dress shoes', 'athletic shoes',
+      ],
+      'Jewelry': [
+        'ring', 'necklace', 'bracelet', 'earring', 'watch', 'jewelry',
+        'pendant', 'chain', 'anklet', 'brooch', 'cufflinks',
+      ],
+      'Electronics': [
+        'phone', 'laptop', 'computer', 'tablet', 'headphones', 'speaker',
+        'charger', 'cable', 'battery', 'camera', 'tv', 'television', 'monitor',
+        'keyboard', 'mouse', 'printer', 'router', 'usb', 'hdmi', 'airpods',
+        'ipad', 'iphone', 'macbook', 'kindle', 'gaming', 'console', 'controller',
+      ],
+      'Toys & Games': [
+        'toy', 'game', 'lego', 'puzzle', 'doll', 'action figure', 'board game',
+        'video game', 'plush', 'stuffed animal', 'nerf', 'barbie', 'hot wheels',
+        'playset', 'building blocks', 'rc car', 'drone',
+      ],
+      'Home & Garden': [
+        'furniture', 'chair', 'table', 'lamp', 'rug', 'curtain', 'pillow',
+        'blanket', 'vase', 'frame', 'mirror', 'plant', 'pot', 'garden',
+        'tool', 'drill', 'hammer', 'screwdriver', 'paint', 'decor',
+      ],
+      'Sports & Outdoors': [
+        'ball', 'bat', 'racket', 'golf', 'tennis', 'soccer', 'basketball',
+        'football', 'yoga', 'weights', 'dumbbell', 'bike', 'bicycle',
+        'camping', 'tent', 'sleeping bag', 'hiking', 'fishing', 'ski',
+      ],
+      'Beauty': [
+        'makeup', 'lipstick', 'mascara', 'foundation', 'eyeshadow', 'blush',
+        'perfume', 'cologne', 'skincare', 'serum', 'moisturizer', 'cleanser',
+        'nail polish', 'hair dye', 'curling iron', 'straightener',
+      ],
+      'Books & Media': [
+        'book', 'novel', 'magazine', 'comic', 'cd', 'dvd', 'vinyl', 'record',
+        'album', 'movie', 'audiobook', 'ebook', 'textbook', 'journal', 'planner',
+      ],
+      'Accessories': [
+        'bag', 'purse', 'wallet', 'belt', 'hat', 'cap', 'scarf', 'gloves',
+        'sunglasses', 'umbrella', 'backpack', 'luggage', 'handbag', 'tote',
+      ],
+      'Gifts': [
+        'gift', 'present', 'card', 'wrapping paper', 'ribbon', 'bow',
+        'gift card', 'certificate', 'flowers', 'bouquet', 'chocolate box',
+      ],
+    };
+
+    // Check each category - longer phrases first for better matching
+    for (final entry in shoppingKeywords.entries) {
       final sortedKeywords = List<String>.from(entry.value)
         ..sort((a, b) => b.length.compareTo(a.length));
 

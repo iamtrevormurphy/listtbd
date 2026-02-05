@@ -52,3 +52,39 @@ class Aisle {
 
 // Keep Categories as alias for backwards compatibility
 typedef Categories = StoreAisles;
+
+/// Shopping categories - retail department categories for shopping lists
+class ShoppingCategories {
+  static const List<Aisle> all = [
+    Aisle(name: 'Clothing', icon: '👕', description: 'Shirts, pants, dresses'),
+    Aisle(name: 'Shoes', icon: '👟', description: 'Footwear of all types'),
+    Aisle(name: 'Jewelry', icon: '💍', description: 'Rings, necklaces, watches'),
+    Aisle(name: 'Electronics', icon: '📱', description: 'Phones, computers, gadgets'),
+    Aisle(name: 'Toys & Games', icon: '🎮', description: 'Toys, board games, video games'),
+    Aisle(name: 'Home & Garden', icon: '🏡', description: 'Furniture, decor, gardening'),
+    Aisle(name: 'Sports & Outdoors', icon: '⚽', description: 'Sports equipment, camping'),
+    Aisle(name: 'Beauty', icon: '💄', description: 'Cosmetics, skincare, fragrance'),
+    Aisle(name: 'Books & Media', icon: '📚', description: 'Books, music, movies'),
+    Aisle(name: 'Accessories', icon: '👜', description: 'Bags, belts, hats'),
+    Aisle(name: 'Gifts', icon: '🎁', description: 'Gift items, cards'),
+    Aisle(name: 'Other', icon: '📦', description: 'Miscellaneous items'),
+  ];
+
+  static Aisle getByName(String name) {
+    return all.firstWhere(
+      (a) => a.name.toLowerCase() == name.toLowerCase(),
+      orElse: () => all.last, // Default to 'Other'
+    );
+  }
+
+  static String getIcon(String categoryName) {
+    return getByName(categoryName).icon;
+  }
+
+  static String getEmoji(String categoryName) => getIcon(categoryName);
+
+  static List<String> get names => all.map((a) => a.name).toList();
+
+  // Prevent instantiation
+  ShoppingCategories._();
+}

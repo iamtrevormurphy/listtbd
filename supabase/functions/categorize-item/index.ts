@@ -5,18 +5,41 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
-const CATEGORIES = [
-  "Dairy",
+const GROCERY_CATEGORIES = [
   "Produce",
-  "Meat & Seafood",
-  "Bakery",
-  "Pantry",
+  "Refrigerated",
   "Frozen",
+  "Bakery",
+  "Deli & Prepared",
+  "Meat & Seafood",
+  "International",
+  "Canned & Jarred",
+  "Dry Goods & Pasta",
+  "Snacks & Candy",
+  "Beverages",
   "Household",
   "Personal Care",
   "Pet Supplies",
   "Other",
 ];
+
+const SHOPPING_CATEGORIES = [
+  "Clothing",
+  "Shoes",
+  "Jewelry",
+  "Electronics",
+  "Toys & Games",
+  "Home & Garden",
+  "Sports & Outdoors",
+  "Beauty",
+  "Books & Media",
+  "Accessories",
+  "Gifts",
+  "Other",
+];
+
+// Keep CATEGORIES as alias for backwards compatibility
+const CATEGORIES = GROCERY_CATEGORIES;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -26,6 +49,7 @@ const corsHeaders = {
 
 interface CategorizeRequest {
   item_name: string;
+  list_type?: "grocery" | "shopping" | "project";
 }
 
 interface CategorizeResponse {
@@ -39,22 +63,52 @@ serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Parse request body once and store it
+  let item_name = "";
+  let list_type: "grocery" | "shopping" | "project" = "grocery";
   try {
-    const { item_name }: CategorizeRequest = await req.json();
+    const body: CategorizeRequest = await req.json();
+    item_name = body.item_name || "";
+    list_type = body.list_type || "grocery";
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: "Invalid request body" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
 
-    if (!item_name || item_name.trim().length === 0) {
-      return new Response(
-        JSON.stringify({ error: "item_name is required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+  if (!item_name || item_name.trim().length === 0) {
+    return new Response(
+      JSON.stringify({ error: "item_name is required" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
 
+  // Project lists don't need categorization
+  if (list_type === "project") {
+    return new Response(
+      JSON.stringify({ category: null, confidence: 0.0 }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  // Select categories based on list type
+  const categories = list_type === "shopping" ? SHOPPING_CATEGORIES : GROCERY_CATEGORIES;
+
+  try {
     if (!ANTHROPIC_API_KEY) {
       // Fallback to simple keyword matching if no API key
-      const category = fallbackCategorize(item_name);
+      const category = list_type === "shopping"
+        ? fallbackCategorizeForShopping(item_name)
+        : fallbackCategorize(item_name);
       return new Response(
         JSON.stringify({ category, confidence: 0.5 }),
         {
@@ -77,7 +131,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: `Categorize this shopping list item into exactly one of these categories: ${CATEGORIES.join(", ")}.
+            content: `Categorize this ${list_type === "shopping" ? "shopping" : "grocery"} list item into exactly one of these categories: ${categories.join(", ")}.
 
 Item: "${item_name}"
 
@@ -101,7 +155,7 @@ The confidence should be between 0 and 1.`,
     const result: CategorizeResponse = JSON.parse(content);
 
     // Validate category is in our list
-    if (!CATEGORIES.includes(result.category)) {
+    if (!categories.includes(result.category)) {
       result.category = "Other";
       result.confidence = 0.5;
     }
@@ -113,8 +167,10 @@ The confidence should be between 0 and 1.`,
     console.error("Error:", error);
 
     // Fallback to simple categorization on error
-    const { item_name } = await req.json().catch(() => ({ item_name: "" }));
-    const category = fallbackCategorize(item_name);
+    // Use the already-parsed item_name variable
+    const category = list_type === "shopping"
+      ? fallbackCategorizeForShopping(item_name)
+      : fallbackCategorize(item_name);
 
     return new Response(
       JSON.stringify({ category, confidence: 0.3 }),
@@ -130,7 +186,6 @@ function fallbackCategorize(itemName: string): string {
   const name = itemName.toLowerCase();
 
   const keywords: Record<string, string[]> = {
-    Dairy: ["milk", "cheese", "yogurt", "butter", "cream", "egg"],
     Produce: [
       "apple",
       "banana",
@@ -144,7 +199,14 @@ function fallbackCategorize(itemName: string): string {
       "spinach",
       "fruit",
       "vegetable",
+      "pepper",
+      "cucumber",
+      "avocado",
     ],
+    Refrigerated: ["milk", "cheese", "yogurt", "butter", "cream", "egg", "juice", "dairy"],
+    Frozen: ["ice cream", "frozen", "pizza", "frozen meal", "frozen vegetable"],
+    Bakery: ["bread", "bagel", "muffin", "croissant", "cake", "donut", "roll", "pastry"],
+    "Deli & Prepared": ["deli", "prepared", "sandwich", "salad", "hummus", "dip"],
     "Meat & Seafood": [
       "chicken",
       "beef",
@@ -155,22 +217,34 @@ function fallbackCategorize(itemName: string): string {
       "turkey",
       "bacon",
       "sausage",
+      "meat",
+      "seafood",
     ],
-    Bakery: ["bread", "bagel", "muffin", "croissant", "cake", "donut", "roll"],
-    Pantry: [
+    International: ["asian", "mexican", "italian", "sushi", "taco", "pasta sauce", "soy sauce"],
+    "Canned & Jarred": [
+      "can",
+      "canned",
+      "jar",
+      "jarred",
+      "soup",
+      "sauce",
+      "pickle",
+      "olive",
+    ],
+    "Dry Goods & Pasta": [
       "rice",
       "pasta",
       "cereal",
-      "soup",
-      "sauce",
-      "oil",
       "flour",
       "sugar",
       "salt",
       "spice",
-      "can",
+      "bean",
+      "lentil",
+      "quinoa",
     ],
-    Frozen: ["ice cream", "frozen", "pizza"],
+    "Snacks & Candy": ["chip", "cookie", "candy", "chocolate", "cracker", "snack", "popcorn"],
+    Beverages: ["drink", "soda", "water", "coffee", "tea", "juice", "beer", "wine"],
     Household: [
       "paper",
       "towel",
@@ -180,6 +254,8 @@ function fallbackCategorize(itemName: string): string {
       "soap",
       "sponge",
       "trash bag",
+      "battery",
+      "light bulb",
     ],
     "Personal Care": [
       "shampoo",
@@ -187,8 +263,37 @@ function fallbackCategorize(itemName: string): string {
       "deodorant",
       "lotion",
       "razor",
+      "soap",
+      "toilet paper",
     ],
-    "Pet Supplies": ["dog", "cat", "pet", "kibble", "litter"],
+    "Pet Supplies": ["dog", "cat", "pet", "kibble", "litter", "treat", "toy"],
+  };
+
+  for (const [category, words] of Object.entries(keywords)) {
+    if (words.some((word) => name.includes(word))) {
+      return category;
+    }
+  }
+
+  return "Other";
+}
+
+// Simple keyword-based fallback categorization for shopping lists
+function fallbackCategorizeForShopping(itemName: string): string {
+  const name = itemName.toLowerCase();
+
+  const keywords: Record<string, string[]> = {
+    Clothing: ["shirt", "pants", "dress", "jeans", "jacket", "sweater", "coat", "skirt", "shorts"],
+    Shoes: ["shoes", "sneakers", "boots", "sandals", "heels", "flats", "loafers"],
+    Jewelry: ["ring", "necklace", "bracelet", "earring", "watch", "jewelry", "pendant"],
+    Electronics: ["phone", "laptop", "tablet", "headphones", "charger", "cable", "camera", "tv", "computer"],
+    "Toys & Games": ["toy", "game", "lego", "puzzle", "doll", "action figure", "board game"],
+    "Home & Garden": ["furniture", "lamp", "rug", "curtain", "pillow", "plant", "tool", "decor"],
+    "Sports & Outdoors": ["ball", "racket", "weights", "bike", "camping", "tent", "hiking", "yoga"],
+    Beauty: ["makeup", "lipstick", "perfume", "skincare", "mascara", "foundation", "nail polish"],
+    "Books & Media": ["book", "magazine", "cd", "dvd", "vinyl", "album", "movie"],
+    Accessories: ["bag", "purse", "wallet", "belt", "hat", "scarf", "sunglasses", "backpack"],
+    Gifts: ["gift", "present", "card", "wrapping", "flowers", "bouquet"],
   };
 
   for (const [category, words] of Object.entries(keywords)) {
