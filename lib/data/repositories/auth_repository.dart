@@ -27,7 +27,9 @@ class AuthRepository {
       data: displayName != null ? {'display_name': displayName} : null,
     );
 
-    if (response.user != null) {
+    // Only create profile if user is authenticated (has session)
+    // If email confirmation is required, session will be null
+    if (response.user != null && response.session != null) {
       // Create profile record
       await _createProfile(response.user!.id, displayName);
     }
@@ -40,10 +42,17 @@ class AuthRepository {
     required String email,
     required String password,
   }) async {
-    return await _client.auth.signInWithPassword(
+    final response = await _client.auth.signInWithPassword(
       email: email,
       password: password,
     );
+
+    // If sign-in successful, ensure profile exists (for users who confirmed email)
+    if (response.user != null && response.session != null) {
+      await _ensureProfileExists(response.user!.id);
+    }
+
+    return response;
   }
 
   /// Sign in with magic link
@@ -97,5 +106,20 @@ class AuthRepository {
       'user_id': userId,
       'name': 'Shopping List',
     });
+  }
+
+  /// Ensure profile exists for user (called on sign-in for email-confirmed users)
+  Future<void> _ensureProfileExists(String userId) async {
+    // Check if profile already exists
+    final existing = await _client
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+
+    if (existing == null) {
+      // Profile doesn't exist, create it
+      await _createProfile(userId, null);
+    }
   }
 }
