@@ -38,7 +38,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       error: (error, _) => Scaffold(
         body: Center(child: Text('Error: $error')),
       ),
-      data: (list) => _HomeContent(list: list),
+      data: (list) {
+        // If no list is selected, navigate to All Lists
+        if (list == null) {
+          // Navigate to AllListsScreen after the build completes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const AllListsScreen()),
+            );
+          });
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return _HomeContent(list: list);
+      },
     );
   }
 }
@@ -419,7 +434,22 @@ class _ListHeader extends StatelessWidget {
                 Icons.chevron_left,
                 color: ThemeConfig.textSecondary,
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
+              // List icon - between arrow and name, closer to name
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  list.iconData,
+                  color: ThemeConfig.primaryColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // List name and description
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,8 +472,7 @@ class _ListHeader extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              // Edit button
+              // Edit button - right aligned
               IconButton(
                 icon: Icon(
                   Icons.edit_outlined,
@@ -454,20 +483,6 @@ class _ListHeader extends StatelessWidget {
                 tooltip: 'Edit list',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-              ),
-              const SizedBox(width: 12),
-              // List icon on right - uses custom icon
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  list.iconData,
-                  color: ThemeConfig.primaryColor,
-                  size: 20,
-                ),
               ),
             ],
           ),

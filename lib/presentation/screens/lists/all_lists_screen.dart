@@ -5,6 +5,7 @@ import '../../../core/config/theme_config.dart';
 import '../../../data/models/shopping_list.dart';
 import '../../providers/list_provider.dart';
 import '../../widgets/animated_background.dart';
+import '../home/home_screen.dart';
 import 'create_list_screen.dart';
 import 'edit_list_screen.dart';
 
@@ -65,7 +66,15 @@ class AllListsScreen extends ConsumerWidget {
                           list: list,
                           onTap: () {
                             ref.read(listNotifierProvider.notifier).switchList(list.id);
-                            Navigator.of(context).pop();
+                            // Check if we can pop (came from HomeScreen) or need to navigate
+                            if (Navigator.of(context).canPop()) {
+                              Navigator.of(context).pop();
+                            } else {
+                              // This is the initial screen - navigate to HomeScreen
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                              );
+                            }
                           },
                           onEdit: () => _navigateToEdit(context, list),
                           onDelete: lists.length > 1

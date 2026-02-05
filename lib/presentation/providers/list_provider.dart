@@ -4,6 +4,7 @@ import '../../data/models/list_item.dart';
 import '../../data/models/shopping_list.dart';
 import '../../data/models/store.dart';
 import '../../data/repositories/list_repository.dart';
+import '../../main.dart' show preferencesService;
 
 /// List repository provider
 final listRepositoryProvider = Provider<ListRepository>((ref) {
@@ -16,11 +17,14 @@ final allListsProvider = FutureProvider<List<ShoppingList>>((ref) async {
   return repo.getLists();
 });
 
-/// Currently selected list ID (persisted in state)
-final selectedListIdProvider = StateProvider<String?>((ref) => null);
+/// Currently selected list ID (persisted in state and local storage)
+final selectedListIdProvider = StateProvider<String?>((ref) {
+  // Initialize from saved preferences
+  return preferencesService.lastListId;
+});
 
-/// Current shopping list provider
-final currentListProvider = FutureProvider<ShoppingList>((ref) async {
+/// Current shopping list provider - returns null if no list is selected
+final currentListProvider = FutureProvider<ShoppingList?>((ref) async {
   final repo = ref.watch(listRepositoryProvider);
   final selectedId = ref.watch(selectedListIdProvider);
 
@@ -28,17 +32,17 @@ final currentListProvider = FutureProvider<ShoppingList>((ref) async {
     try {
       return await repo.getList(selectedId);
     } catch (_) {
-      // If selected list doesn't exist, fall back to default
+      // If selected list doesn't exist, clear the saved preference
+      Future.microtask(() {
+        ref.read(selectedListIdProvider.notifier).state = null;
+        preferencesService.clearLastListId();
+      });
+      return null;
     }
   }
 
-  // Get default list and update selected ID
-  final defaultList = await repo.getDefaultList();
-  // Use Future.microtask to avoid modifying provider during build
-  Future.microtask(() {
-    ref.read(selectedListIdProvider.notifier).state = defaultList.id;
-  });
-  return defaultList;
+  // No list selected - return null to show All Lists page
+  return null;
 });
 
 /// Active (non-archived) items stream
@@ -224,6 +228,8 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
   /// Switch to a different list
   void switchList(String listId) {
     _ref.read(selectedListIdProvider.notifier).state = listId;
+    // Save to preferences for persistence across app launches
+    preferencesService.setLastListId(listId);
     _ref.invalidate(currentListProvider);
   }
 
@@ -258,10 +264,11 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
       await _repository.deleteList(listId);
       _ref.invalidate(allListsProvider);
 
-      // If we deleted the current list, switch to default
+      // If we deleted the current list, clear selection and saved preference
       final currentId = _ref.read(selectedListIdProvider);
       if (currentId == listId) {
         _ref.read(selectedListIdProvider.notifier).state = null;
+        preferencesService.clearLastListId();
         _ref.invalidate(currentListProvider);
       }
     });

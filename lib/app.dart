@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/config/theme_config.dart';
+import 'main.dart' show preferencesService;
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/screens/home/home_screen.dart';
 import 'presentation/screens/auth/login_screen.dart';
+import 'presentation/screens/lists/all_lists_screen.dart';
 
 class ListApp extends ConsumerWidget {
   const ListApp({super.key});
@@ -20,7 +22,15 @@ class ListApp extends ConsumerWidget {
       darkTheme: ThemeConfig.darkTheme,
       themeMode: ThemeMode.light, // Default to light mode
       home: authState.when(
-        data: (session) => session != null ? const HomeScreen() : const LoginScreen(),
+        data: (session) {
+          if (session == null) return const LoginScreen();
+          // Check if there's a saved list to return to
+          if (preferencesService.hasLastList) {
+            return const HomeScreen();
+          }
+          // No saved list - show the lists page
+          return const AllListsScreen();
+        },
         loading: () => const Scaffold(
           body: Center(child: CircularProgressIndicator()),
         ),

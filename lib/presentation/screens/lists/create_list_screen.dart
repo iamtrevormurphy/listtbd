@@ -6,6 +6,7 @@ import '../../../data/models/shopping_list.dart';
 import '../../providers/list_provider.dart';
 import '../../widgets/animated_background.dart';
 import '../../widgets/icon_picker.dart';
+import '../home/home_screen.dart';
 
 class CreateListScreen extends ConsumerStatefulWidget {
   const CreateListScreen({super.key});
@@ -47,9 +48,13 @@ class _CreateListScreenState extends ConsumerState<CreateListScreen> {
     setState(() => _isLoading = false);
 
     if (newList != null) {
-      // Switch to the new list
+      // Switch to the new list (this saves the preference)
       notifier.switchList(newList.id);
-      Navigator.of(context).pop(newList);
+      // Navigate to HomeScreen, clearing the stack
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (route) => false,
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
