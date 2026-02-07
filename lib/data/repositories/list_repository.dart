@@ -112,6 +112,7 @@ class ListRepository {
         .from('items')
         .stream(primaryKey: ['id'])
         .eq('list_id', listId)
+        .order('sort_order', ascending: true)
         .order('created_at', ascending: false)
         .map((data) => data
             .map((json) => ListItem.fromJson(json))
@@ -143,6 +144,19 @@ class ListRepository {
     double? categoryConfidence,
     String? store,
   }) async {
+    // Get the max sort_order for this list to add at the end
+    final maxOrderResult = await _client
+        .from('items')
+        .select('sort_order')
+        .eq('list_id', listId)
+        .eq('is_archived', false)
+        .order('sort_order', ascending: false)
+        .limit(1);
+
+    final maxOrder = (maxOrderResult as List).isNotEmpty
+        ? (maxOrderResult[0]['sort_order'] as int? ?? 0)
+        : 0;
+
     final now = DateTime.now().toUtc();
     final newItem = {
       'id': _uuid.v4(),
@@ -153,6 +167,7 @@ class ListRepository {
       'category_confidence': categoryConfidence,
       'store': store,
       'quantity': 1,
+      'sort_order': maxOrder + 1,
       'is_archived': false,
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
@@ -258,6 +273,22 @@ class ListRepository {
         .single();
 
     return ListItem.fromJson(response);
+  }
+
+  /// Reorder items by updating their sort_order values
+  Future<void> reorderItems(List<String> itemIds) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    // Update each item with its new sort order
+    for (var i = 0; i < itemIds.length; i++) {
+      await _client
+          .from('items')
+          .update({
+            'sort_order': i,
+            'updated_at': now,
+          })
+          .eq('id', itemIds[i]);
+    }
   }
 
   // ============ Stores ============

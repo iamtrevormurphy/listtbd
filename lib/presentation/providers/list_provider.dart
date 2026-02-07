@@ -188,6 +188,13 @@ class ListNotifier extends StateNotifier<AsyncValue<void>> {
     });
   }
 
+  Future<void> reorderItems(List<String> itemIds) async {
+    state = const AsyncValue.loading();
+    state = await AsyncValue.guard(() async {
+      await _repository.reorderItems(itemIds);
+    });
+  }
+
   Future<Store?> addStore(String name) async {
     if (name.trim().isEmpty) return null;
 

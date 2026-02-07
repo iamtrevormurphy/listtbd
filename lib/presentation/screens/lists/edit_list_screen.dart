@@ -244,56 +244,85 @@ class _EditListScreenState extends ConsumerState<EditListScreen> {
                               ),
                         ),
                         const SizedBox(height: 8),
-                        SegmentedButton<ListType>(
-                          segments: ListType.values.map((type) {
-                            return ButtonSegment<ListType>(
-                              value: type,
-                              label: Text(type.displayName),
-                              icon: Icon(type.icon),
-                            );
-                          }).toList(),
-                          selected: {_selectedType},
-                          onSelectionChanged: (Set<ListType> selected) {
-                            setState(() => _selectedType = selected.first);
-                          },
-                          style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.resolveWith((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return ThemeConfig.primaryColor.withValues(alpha: 0.15);
-                              }
-                              return Colors.white;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: ThemeConfig.primaryColor.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: ThemeConfig.primaryColor.withValues(alpha: 0.2),
+                        DropdownButtonFormField<ListType>(
+                          initialValue: _selectedType,
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: ThemeConfig.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(color: ThemeConfig.border),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _selectedType.icon,
-                                size: 20,
-                                color: ThemeConfig.primaryColor,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _selectedType.description,
-                                  style: TextStyle(
-                                    color: ThemeConfig.textSecondary,
-                                    fontSize: 13,
+                          items: ListType.values.map((type) {
+                            return DropdownMenuItem<ListType>(
+                              value: type,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    type.icon,
+                                    size: 20,
+                                    color: ThemeConfig.primaryColor,
                                   ),
-                                ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          type.displayName,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                        Text(
+                                          type.description,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: ThemeConfig.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedType = value);
+                            }
+                          },
+                          selectedItemBuilder: (context) {
+                            return ListType.values.map((type) {
+                              return Row(
+                                children: [
+                                  Icon(
+                                    type.icon,
+                                    size: 20,
+                                    color: ThemeConfig.primaryColor,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    type.displayName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }).toList();
+                          },
                         ),
                       ],
                     ),

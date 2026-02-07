@@ -11,6 +11,7 @@ class ListItem {
   final String? store; // Store name (e.g., "Whole Foods", "Costco")
   final String? notes;
   final int quantity;
+  final int sortOrder; // For manual ordering in project lists
   final bool isArchived;
   final DateTime? archivedAt;
   final DateTime createdAt;
@@ -26,6 +27,7 @@ class ListItem {
     this.store,
     this.notes,
     this.quantity = 1,
+    this.sortOrder = 0,
     this.isArchived = false,
     this.archivedAt,
     required this.createdAt,
@@ -45,6 +47,7 @@ class ListItem {
       store: json['store'] as String?,
       notes: json['notes'] as String?,
       quantity: json['quantity'] as int? ?? 1,
+      sortOrder: json['sort_order'] as int? ?? 0,
       isArchived: json['is_archived'] as bool? ?? false,
       archivedAt: json['archived_at'] != null
           ? DateTime.parse(json['archived_at'] as String)
@@ -65,6 +68,7 @@ class ListItem {
       'store': store,
       'notes': notes,
       'quantity': quantity,
+      'sort_order': sortOrder,
       'is_archived': isArchived,
       'archived_at': archivedAt?.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -83,6 +87,7 @@ class ListItem {
     String? store,
     String? notes,
     int? quantity,
+    int? sortOrder,
     bool? isArchived,
     DateTime? archivedAt,
     DateTime? createdAt,
@@ -98,6 +103,7 @@ class ListItem {
       store: store ?? this.store,
       notes: notes ?? this.notes,
       quantity: quantity ?? this.quantity,
+      sortOrder: sortOrder ?? this.sortOrder,
       isArchived: isArchived ?? this.isArchived,
       archivedAt: archivedAt ?? this.archivedAt,
       createdAt: createdAt ?? this.createdAt,

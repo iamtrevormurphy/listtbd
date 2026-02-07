@@ -17,6 +17,7 @@ class SwipeableItem extends StatelessWidget {
   final Function(String) onCategoryChanged;
   final Function(String?)? onStoreChanged;
   final List<Store>? stores;
+  final int? itemNumber; // For project lists, shows the item number
 
   const SwipeableItem({
     super.key,
@@ -28,6 +29,7 @@ class SwipeableItem extends StatelessWidget {
     required this.onCategoryChanged,
     this.onStoreChanged,
     this.stores,
+    this.itemNumber,
   });
 
   @override
@@ -99,6 +101,26 @@ class SwipeableItem extends StatelessWidget {
         child: ListTile(
           onTap: onTap,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: listType == ListType.project && itemNumber != null
+              ? Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: ThemeConfig.primaryColor.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$itemNumber',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: ThemeConfig.primaryColor,
+                      ),
+                    ),
+                  ),
+                )
+              : null,
           title: Text(
             item.name,
             style: TextStyle(
@@ -111,7 +133,8 @@ class SwipeableItem extends StatelessWidget {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (item.quantity > 1)
+              // Show quantity badge only for non-project lists
+              if (item.quantity > 1 && listType != ListType.project)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -127,12 +150,21 @@ class SwipeableItem extends StatelessWidget {
                     ),
                   ),
                 ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: Colors.grey.shade400,
-                size: 20,
-              ),
+              // Show drag handle for project lists
+              if (listType == ListType.project)
+                Icon(
+                  Icons.drag_handle,
+                  color: Colors.grey.shade400,
+                  size: 20,
+                )
+              else ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.chevron_right,
+                  color: Colors.grey.shade400,
+                  size: 20,
+                ),
+              ],
             ],
           ),
         ),

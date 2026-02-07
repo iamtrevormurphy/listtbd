@@ -232,7 +232,7 @@ class _HomeContent extends ConsumerWidget {
                 final stores = storesAsync.valueOrNull ?? [];
 
                 if (items.isEmpty && suggestions.isEmpty) {
-                  return const _EmptyState();
+                  return _EmptyState(listType: list.type);
                 }
 
                 return _ContentList(
@@ -241,6 +241,7 @@ class _HomeContent extends ConsumerWidget {
                   stores: stores,
                   sortMode: sortMode,
                   listType: list.type,
+                  listId: listId,
                   onAddSuggestion: (s) => _addSuggestion(context, ref, s),
                   onDismissSuggestion: (s) => _dismissSuggestion(ref, s),
                   onArchive: (item) => _archiveItem(context, ref, item),
@@ -371,7 +372,20 @@ class _HomeContent extends ConsumerWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final ListType listType;
+
+  const _EmptyState({required this.listType});
+
+  IconData get _icon {
+    switch (listType) {
+      case ListType.grocery:
+        return Icons.shopping_cart_outlined;
+      case ListType.shopping:
+        return Icons.shopping_bag_outlined;
+      case ListType.project:
+        return Icons.checklist_outlined;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -386,7 +400,7 @@ class _EmptyState extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.shopping_cart_outlined,
+              _icon,
               size: 64,
               color: ThemeConfig.primaryColor,
             ),
@@ -522,6 +536,7 @@ class _ContentList extends ConsumerWidget {
   final List<Store> stores;
   final SortMode sortMode;
   final ListType listType;
+  final String listId;
   final Function(RepurchaseSuggestion) onAddSuggestion;
   final Function(RepurchaseSuggestion) onDismissSuggestion;
   final Function(ListItem) onArchive;
@@ -536,6 +551,7 @@ class _ContentList extends ConsumerWidget {
     required this.stores,
     required this.sortMode,
     required this.listType,
+    required this.listId,
     required this.onAddSuggestion,
     required this.onDismissSuggestion,
     required this.onArchive,
@@ -547,6 +563,11 @@ class _ContentList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // For project lists, use reorderable list
+    if (listType == ListType.project) {
+      return _buildProjectList(context, ref);
+    }
+
     // Get grouped items based on sort mode
     final Map<String, List<ListItem>> grouped;
     if (sortMode == SortMode.store) {
@@ -645,6 +666,61 @@ class _ContentList extends ConsumerWidget {
             ],
           );
         }),
+      ],
+    );
+  }
+
+  Widget _buildProjectList(BuildContext context, WidgetRef ref) {
+    return CustomScrollView(
+      slivers: [
+        // Suggestions section
+        if (suggestions.isNotEmpty)
+          SliverToBoxAdapter(
+            child: SuggestionsList(
+              suggestions: suggestions,
+              onAdd: onAddSuggestion,
+              onDismiss: onDismissSuggestion,
+            ),
+          ),
+
+        // Reorderable project items
+        SliverPadding(
+          padding: const EdgeInsets.only(bottom: 16),
+          sliver: SliverReorderableList(
+            itemCount: items.length,
+            onReorder: (oldIndex, newIndex) {
+              // Adjust for the removal/insertion behavior
+              if (newIndex > oldIndex) newIndex--;
+
+              // Create new order
+              final reorderedItems = List<ListItem>.from(items);
+              final movedItem = reorderedItems.removeAt(oldIndex);
+              reorderedItems.insert(newIndex, movedItem);
+
+              // Update the database with new order
+              final itemIds = reorderedItems.map((item) => item.id).toList();
+              ref.read(listNotifierProvider.notifier).reorderItems(itemIds);
+            },
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return ReorderableDelayedDragStartListener(
+                key: ValueKey(item.id),
+                index: index,
+                child: SwipeableItem(
+                  item: item,
+                  listType: listType,
+                  itemNumber: index + 1,
+                  onArchive: () => onArchive(item),
+                  onDelete: () => onDelete(item),
+                  onTap: () => onTap(item),
+                  onCategoryChanged: (cat) => onCategoryChanged(item, cat),
+                  onStoreChanged: (store) => onStoreChanged(item, store),
+                  stores: stores,
+                ),
+              );
+            },
+          ),
+        ),
       ],
     );
   }
@@ -980,29 +1056,30 @@ class _EditItemSheetState extends ConsumerState<_EditItemSheet> {
                 ),
                 maxLines: 2,
               ),
-              const SizedBox(height: 16),
-
-              // Quantity selector
-              Row(
-                children: [
-                  const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w500)),
-                  const SizedBox(width: 16),
-                  IconButton(
-                    icon: const Icon(Icons.remove_circle_outline),
-                    onPressed: _quantity > 1
-                        ? () => setState(() => _quantity--)
-                        : null,
-                  ),
-                  Text(
-                    '$_quantity',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.add_circle_outline),
-                    onPressed: () => setState(() => _quantity++),
-                  ),
-                ],
-              ),
+              // Quantity selector - only show for non-project lists
+              if (widget.listType != ListType.project) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Text('Quantity:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(width: 16),
+                    IconButton(
+                      icon: const Icon(Icons.remove_circle_outline),
+                      onPressed: _quantity > 1
+                          ? () => setState(() => _quantity--)
+                          : null,
+                    ),
+                    Text(
+                      '$_quantity',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: () => setState(() => _quantity++),
+                    ),
+                  ],
+                ),
+              ],
               // Store dropdown - only show for lists that support stores
               if (widget.listType != ListType.project) ...[
                 const SizedBox(height: 16),
