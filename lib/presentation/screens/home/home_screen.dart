@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -671,22 +673,20 @@ class _ContentList extends ConsumerWidget {
   }
 
   Widget _buildProjectList(BuildContext context, WidgetRef ref) {
-    return CustomScrollView(
-      slivers: [
+    return Column(
+      children: [
         // Suggestions section
         if (suggestions.isNotEmpty)
-          SliverToBoxAdapter(
-            child: SuggestionsList(
-              suggestions: suggestions,
-              onAdd: onAddSuggestion,
-              onDismiss: onDismissSuggestion,
-            ),
+          SuggestionsList(
+            suggestions: suggestions,
+            onAdd: onAddSuggestion,
+            onDismiss: onDismissSuggestion,
           ),
 
         // Reorderable project items
-        SliverPadding(
-          padding: const EdgeInsets.only(bottom: 16),
-          sliver: SliverReorderableList(
+        Expanded(
+          child: ReorderableListView.builder(
+            padding: const EdgeInsets.only(bottom: 16),
             itemCount: items.length,
             onReorder: (oldIndex, newIndex) {
               // Adjust for the removal/insertion behavior
@@ -700,6 +700,26 @@ class _ContentList extends ConsumerWidget {
               // Update the database with new order
               final itemIds = reorderedItems.map((item) => item.id).toList();
               ref.read(listNotifierProvider.notifier).reorderItems(itemIds);
+            },
+            proxyDecorator: (child, index, animation) {
+              return AnimatedBuilder(
+                animation: animation,
+                builder: (context, child) {
+                  final elevation = lerpDouble(0, 8, animation.value)!;
+                  final scale = lerpDouble(1, 1.02, animation.value)!;
+                  return Transform.scale(
+                    scale: scale,
+                    child: Material(
+                      elevation: elevation,
+                      color: Colors.transparent,
+                      shadowColor: ThemeConfig.primaryColor.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                      child: child,
+                    ),
+                  );
+                },
+                child: child,
+              );
             },
             itemBuilder: (context, index) {
               final item = items[index];
